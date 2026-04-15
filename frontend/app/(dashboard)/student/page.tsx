@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { getCurrentStudentRecord } from "@/lib/api/current-student";
+import { unwrapBackendList } from "@/lib/api/pagination";
 
 export default function StudentDashboardPage() {
   const [studentName, setStudentName] = useState("Student");
@@ -22,27 +23,27 @@ export default function StudentDashboardPage() {
       }
       setStudentName(student.name);
 
-      const [courseRows, attendanceRows, feeRows] = await Promise.all([
-        apiClient.get<Array<{ id: number; name: string; course_code: string }>>("/courses", {
+      const [coursePayload, attendancePayload, feePayload] = await Promise.all([
+        apiClient.get<unknown>("/courses", {
           skip: 0,
           limit: 50,
           department: student.department,
         }),
-        apiClient.get<Array<{ id: number; status: string; date: string }>>("/attendance", {
+        apiClient.get<unknown>("/attendance", {
           skip: 0,
           limit: 50,
           student_id: student.id,
         }),
-        apiClient.get<Array<{ id: number; balance_amount: number; status: string }>>("/fees", {
+        apiClient.get<unknown>("/fees", {
           skip: 0,
           limit: 50,
           student_id: student.id,
         }),
       ]);
 
-      setCourses(courseRows);
-      setAttendance(attendanceRows);
-      setFees(feeRows);
+      setCourses(unwrapBackendList<{ id: number; name: string; course_code: string }>(coursePayload));
+      setAttendance(unwrapBackendList<{ id: number; status: string; date: string }>(attendancePayload));
+      setFees(unwrapBackendList<{ id: number; balance_amount: number; status: string }>(feePayload));
     })();
   }, []);
 

@@ -22,6 +22,15 @@ interface ApiListPageProps {
     fields: Array<{ key: string; label: string; type?: "text" | "number" | "date" }>;
     onCreate: (payload: Record<string, unknown>) => Promise<void>;
   };
+  updateConfig?: {
+    idKey: string;
+    fields: Array<{ key: string; label: string; type?: "text" | "number" | "date" }>;
+    onUpdate: (id: string | number, payload: Record<string, unknown>) => Promise<void>;
+  };
+  deleteConfig?: {
+    idKey: string;
+    onDelete: (id: string | number) => Promise<void>;
+  };
 }
 
 type RowData = Record<string, unknown>;
@@ -36,12 +45,22 @@ function normalizeRows(payload: unknown): RowData[] {
   return [];
 }
 
-export function ApiListPage({ title, description, fetchData, createConfig }: ApiListPageProps) {
+export function ApiListPage({
+  title,
+  description,
+  fetchData,
+  createConfig,
+  updateConfig,
+  deleteConfig,
+}: ApiListPageProps) {
   const [rows, setRows] = useState<RowData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formState, setFormState] = useState<Record<string, string>>({});
   const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -75,14 +94,14 @@ export function ApiListPage({ title, description, fetchData, createConfig }: Api
         </Button>
       </PageHeader>
 
-      {createConfig ? (
+      {(createConfig || updateConfig) ? (
         <Card>
           <CardHeader>
-            <CardTitle>Create Record</CardTitle>
+            <CardTitle>{editingId ? "Edit Record" : "Create Record"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {createConfig.fields.map((field) => (
+              {(editingId ? updateConfig?.fields : createConfig?.fields)?.map((field) => (
                 <label key={field.key} className="space-y-1">
                   <span className="text-xs text-muted-foreground">{field.label}</span>
                   <input
@@ -97,28 +116,47 @@ export function ApiListPage({ title, description, fetchData, createConfig }: Api
               ))}
             </div>
             <Button
-              disabled={isCreating}
+              disabled={isCreating || isUpdating}
               onClick={async () => {
-                setIsCreating(true);
+                const activeFields = (editingId ? updateConfig?.fields : createConfig?.fields) || [];
                 try {
                   const payload: Record<string, unknown> = {};
-                  for (const field of createConfig.fields) {
+                  for (const field of activeFields) {
                     const raw = formState[field.key];
                     payload[field.key] =
                       field.type === "number" ? Number(raw || 0) : raw;
                   }
-                  await createConfig.onCreate(payload);
+                  if (editingId && updateConfig) {
+                    setIsUpdating(true);
+                    await updateConfig.onUpdate(editingId, payload);
+                  } else if (createConfig) {
+                    setIsCreating(true);
+                    await createConfig.onCreate(payload);
+                  }
                   setFormState({});
+                  setEditingId(null);
                   await load();
                 } catch (err) {
                   setError(err instanceof Error ? err.message : "Create failed.");
                 } finally {
                   setIsCreating(false);
+                  setIsUpdating(false);
                 }
               }}
             >
-              {isCreating ? "Creating..." : "Create"}
+              {isCreating ? "Creating..." : isUpdating ? "Updating..." : editingId ? "Update" : "Create"}
             </Button>
+            {editingId ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingId(null);
+                  setFormState({});
+                }}
+              >
+                Cancel Edit
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -159,6 +197,7 @@ export function ApiListPage({ title, description, fetchData, createConfig }: Api
                   {columns.map((column) => (
                     <TableHead key={column}>{column}</TableHead>
                   ))}
+                  {(updateConfig || deleteConfig) ? <TableHead>Actions</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -167,6 +206,61 @@ export function ApiListPage({ title, description, fetchData, createConfig }: Api
                     {columns.map((column) => (
                       <TableCell key={column}>{String(row[column] ?? "-")}</TableCell>
                     ))}
+                    {(updateConfig || deleteConfig) ? (
+                      <TableCell className="space-x-2">
+                        {updateConfig ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const id = row[updateConfig.idKey] as string | number;
+                              if (id === undefined || id === null) {
+                                setError(`Cannot edit: missing ${updateConfig.idKey}`);
+                                return;
+                              }
+                              const nextState: Record<string, string> = {};
+                              updateConfig.fields.forEach((field) => {
+                                nextState[field.key] = String(row[field.key] ?? "");
+                              });
+                              setFormState(nextState);
+                              setEditingId(id);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        ) : null}
+                        {deleteConfig ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={isDeleting}
+                            onClick={async () => {
+                              const id = row[deleteConfig.idKey] as string | number;
+                              if (id === undefined || id === null) {
+                                setError(`Cannot delete: missing ${deleteConfig.idKey}`);
+                                return;
+                              }
+                              setIsDeleting(true);
+                              setError(null);
+                              try {
+                                await deleteConfig.onDelete(id);
+                                if (editingId === id) {
+                                  setEditingId(null);
+                                  setFormState({});
+                                }
+                                await load();
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : "Delete failed.");
+                              } finally {
+                                setIsDeleting(false);
+                              }
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_roles
 from app.db.session import get_db
 from app.models.enrollment import Enrollment
+from app.schemas.common import paginated_response
 from app.schemas.enrollment import EnrollmentCreate
 
 router = APIRouter()
@@ -12,7 +14,8 @@ router = APIRouter()
 @router.post("/enroll")
 def enroll_student(
     enrollment: EnrollmentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     new_enrollment = Enrollment(
@@ -24,37 +27,29 @@ def enroll_student(
     db.commit()
     db.refresh(new_enrollment)
 
-    return {
-        "message": "Student enrolled successfully"
-    }
+    return new_enrollment
 
 
 # GET ALL ENROLLMENTS
 @router.get("/all")
 def get_all_enrollments(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty"]))
 ):
 
     enrollments = db.query(Enrollment).all()
 
     return enrollments
-from fastapi import Query
-from sqlalchemy.orm import Session
-from fastapi import Depends
 
 
 @router.get("/")
 def get_enrollments(
     skip: int = 0,
     limit: int = 10,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty", "student"]))
 ):
-
-    enrollments = (
-        db.query(Enrollment)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return enrollments
+    query = db.query(Enrollment)
+    total = query.count()
+    enrollments = query.offset(skip).limit(limit).all()
+    return paginated_response(enrollments, total, skip, limit)

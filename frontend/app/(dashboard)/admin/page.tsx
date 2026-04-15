@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { unwrapBackendList } from "@/lib/api/pagination";
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<Record<string, number>>({});
@@ -12,11 +13,13 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     void (async () => {
-      const [dashboard, students, faculty] = await Promise.all([
+      const [dashboard, studentsPayload, facultyPayload] = await Promise.all([
         apiClient.get<Record<string, number>>("/dashboard/stats"),
-        apiClient.get<Array<{ id: number; name: string; email: string }>>("/students", { skip: 0, limit: 5 }),
-        apiClient.get<Array<{ id: number; name: string; email: string }>>("/faculty", { skip: 0, limit: 5 }),
+        apiClient.get<unknown>("/students", { skip: 0, limit: 5 }),
+        apiClient.get<unknown>("/faculty", { skip: 0, limit: 5 }),
       ]);
+      const students = unwrapBackendList<{ id: number; name: string; email: string }>(studentsPayload);
+      const faculty = unwrapBackendList<{ id: number; name: string; email: string }>(facultyPayload);
       setStats(dashboard);
       setRecentStudents(students);
       setRecentFaculty(faculty);

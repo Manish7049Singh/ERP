@@ -13,6 +13,9 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60)
     )
+    REFRESH_TOKEN_EXPIRE_MINUTES = int(
+        os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7)
+    )
 
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     ALGORITHM = os.getenv("ALGORITHM", "HS256")

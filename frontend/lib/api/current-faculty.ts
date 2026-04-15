@@ -1,5 +1,6 @@
 import { authApi } from "./auth";
 import { apiClient } from "./client";
+import { unwrapBackendList } from "./pagination";
 
 interface FacultyRecord {
   id: number;
@@ -13,10 +14,11 @@ interface FacultyRecord {
 
 export async function getCurrentFacultyRecord(): Promise<FacultyRecord | null> {
   const user = await authApi.getCurrentUser();
-  const records = await apiClient.get<FacultyRecord[]>("/faculty", {
+  const recordsPayload = await apiClient.get<unknown>("/faculty", {
     skip: 0,
     limit: 1,
     email: user.email,
   });
+  const records = unwrapBackendList<FacultyRecord>(recordsPayload);
   return records[0] || null;
 }

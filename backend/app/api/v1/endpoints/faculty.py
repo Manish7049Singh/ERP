@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.core.permissions import require_roles
 from app.db.session import get_db
 from app.models.faculty import Faculty
+from app.schemas.common import paginated_response
 from app.schemas.faculty import FacultyCreate
 from fastapi import Query
 
@@ -15,7 +17,8 @@ router = APIRouter()
 @router.post("/create")
 def create_faculty(
     faculty: FacultyCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     try:
@@ -32,17 +35,16 @@ def create_faculty(
         db.commit()
         db.refresh(new_faculty)
 
-        return {
-            "message": "Faculty created"
-        }
+        return new_faculty
 
-    except IntegrityError:
+    except IntegrityError as exc:
 
         db.rollback()
 
-        return {
-            "error": "Faculty with this email or ID already exists"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Faculty with this email or ID already exists",
+        ) from exc
 
 
 # GET ALL FACULTY
@@ -53,7 +55,8 @@ def get_faculty(
     search: str = Query(default=None),
     email: str = Query(default=None),
     department: str = Query(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty"]))
 ):
 
     query = db.query(Faculty)
@@ -69,24 +72,20 @@ def get_faculty(
     if department:
         query = query.filter(Faculty.department == department)
 
-    faculty = (
-        query
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return faculty
+    total = query.count()
+    faculty = query.offset(skip).limit(limit).all()
+    return paginated_response(faculty, total, skip, limit)
 
 
 @router.get("/{faculty_id}")
 def get_faculty_by_id(
     faculty_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty"]))
 ):
     db_faculty = db.query(Faculty).filter(Faculty.faculty_id == faculty_id).first()
     if not db_faculty:
-        return {"error": "Faculty not found"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
     return db_faculty
 
 
@@ -95,7 +94,8 @@ def get_faculty_by_id(
 def update_faculty(
     faculty_id: str,
     faculty: FacultyCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     db_faculty = db.query(Faculty).filter(
@@ -103,9 +103,7 @@ def update_faculty(
     ).first()
 
     if not db_faculty:
-        return {
-            "error": "Faculty not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
 
     db_faculty.name = faculty.name
     db_faculty.email = faculty.email
@@ -116,15 +114,14 @@ def update_faculty(
     db.commit()
     db.refresh(db_faculty)
 
-    return {
-        "message": "Faculty updated"
-    }
+    return db_faculty
 
 
 @router.post("/")
 def create_faculty_rest(
     faculty: FacultyCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return create_faculty(faculty=faculty, db=db)
 
@@ -133,7 +130,8 @@ def create_faculty_rest(
 def update_faculty_rest(
     faculty_id: str,
     faculty: FacultyCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return update_faculty(faculty_id=faculty_id, faculty=faculty, db=db)
 
@@ -142,7 +140,8 @@ def update_faculty_rest(
 @router.delete("/delete/{faculty_id}")
 def delete_faculty(
     faculty_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     db_faculty = db.query(Faculty).filter(
@@ -150,21 +149,18 @@ def delete_faculty(
     ).first()
 
     if not db_faculty:
-        return {
-            "error": "Faculty not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
 
     db.delete(db_faculty)
     db.commit()
 
-    return {
-        "message": "Faculty deleted"
-    }
+    return {"success": True}
 
 
 @router.delete("/{faculty_id}")
 def delete_faculty_rest(
     faculty_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return delete_faculty(faculty_id=faculty_id, db=db)

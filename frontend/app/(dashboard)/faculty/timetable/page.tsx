@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiClient } from "@/lib/api";
 import { getCurrentFacultyRecord } from "@/lib/api/current-faculty";
+import { subjectsService, timetableService } from "@/services";
 
 interface TimetableRow {
   id: number;
@@ -34,8 +34,8 @@ export default function FacultyTimetablePage() {
         return;
       }
       const [tt, subjectRows] = await Promise.all([
-        apiClient.get<TimetableRow[]>("/timetable", { skip: 0, limit: 200, faculty_id: faculty.id }),
-        apiClient.get<SubjectRow[]>("/subjects", { skip: 0, limit: 200 }),
+        timetableService.list({ skip: 0, limit: 200, faculty_id: faculty.id }),
+        subjectsService.list({ skip: 0, limit: 200 }),
       ]);
       setItems(tt);
       setSubjects(Object.fromEntries(subjectRows.map((s) => [s.id, s.name])));

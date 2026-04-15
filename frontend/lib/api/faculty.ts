@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/config/api";
 import type { Faculty, FacultyFormData, PaginatedResponse, ApiResponse, FilterState } from "@/types";
+import { isBackendPaginatedResponse } from "./pagination";
 
 // ============================================
 // FACULTY API SERVICE
@@ -16,7 +17,34 @@ export const facultyApi = {
     const skip = (page - 1) * limit;
 
     const response = await apiClient.get<
-      Array<{
+      | Array<{
+          id: string | number;
+          faculty_id?: string;
+          name: string;
+          email?: string;
+          phone?: string;
+          department?: string;
+          designation?: string;
+        }>
+      | {
+          data: Array<{
+            id: string | number;
+            faculty_id?: string;
+            name: string;
+            email?: string;
+            phone?: string;
+            department?: string;
+            designation?: string;
+          }>;
+          meta: { total: number; page: number; limit: number; total_pages: number };
+        }
+    >(API_ENDPOINTS.FACULTY.BASE, {
+      skip,
+      limit,
+      search: filters.search,
+    });
+
+    const rows = isBackendPaginatedResponse<{
         id: string | number;
         faculty_id?: string;
         name: string;
@@ -24,15 +52,12 @@ export const facultyApi = {
         phone?: string;
         department?: string;
         designation?: string;
-      }>
-    >(API_ENDPOINTS.FACULTY.BASE, {
-      skip,
-      limit,
-      search: filters.search,
-    });
+      }>(response)
+      ? response.data
+      : response;
 
-    const normalized: Faculty[] = response.map((item) => ({
-      id: String(item.id),
+    const normalized: Faculty[] = rows.map((item) => ({
+      id: item.faculty_id || String(item.id),
       userId: String(item.id),
       employeeId: item.faculty_id || "",
       name: item.name,
@@ -53,10 +78,10 @@ export const facultyApi = {
 
     return {
       data: normalized,
-      total: normalized.length,
-      page,
-      limit,
-      totalPages: normalized.length < limit ? page : page + 1,
+      total: isBackendPaginatedResponse(response) ? response.meta.total : normalized.length,
+      page: isBackendPaginatedResponse(response) ? response.meta.page : page,
+      limit: isBackendPaginatedResponse(response) ? response.meta.limit : limit,
+      totalPages: isBackendPaginatedResponse(response) ? response.meta.total_pages : 1,
     };
   },
 
@@ -75,7 +100,7 @@ export const facultyApi = {
     }>(API_ENDPOINTS.FACULTY.BY_ID(id));
 
     return {
-      id: String(item.id),
+      id: item.faculty_id || String(item.id),
       userId: String(item.id),
       employeeId: item.faculty_id || "",
       name: item.name,
@@ -99,14 +124,85 @@ export const facultyApi = {
    * Create new faculty
    */
   create: async (data: FacultyFormData): Promise<Faculty> => {
-    return apiClient.post<Faculty>(API_ENDPOINTS.FACULTY.BASE, data);
+    const payload = {
+      faculty_id: data.employeeId,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      department: data.departmentId,
+      designation: data.designation,
+    };
+    const created = await apiClient.post<{
+      id: string | number;
+      faculty_id: string;
+      name: string;
+      email: string;
+      phone: string;
+      department: string;
+      designation: string;
+    }>(API_ENDPOINTS.FACULTY.BASE, payload);
+    return {
+      id: created.faculty_id || String(created.id),
+      userId: String(created.id),
+      employeeId: created.faculty_id,
+      name: created.name,
+      email: created.email,
+      phone: created.phone,
+      address: data.address,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      qualification: data.qualification,
+      specialization: data.specialization,
+      departmentId: created.department,
+      designation: created.designation,
+      joiningDate: "",
+      status: "active",
+      assignedSubjects: [],
+      assignedCourses: [],
+    };
   },
 
   /**
    * Update faculty
    */
   update: async (id: string, data: Partial<FacultyFormData>): Promise<Faculty> => {
-    return apiClient.put<Faculty>(API_ENDPOINTS.FACULTY.BY_ID(id), data);
+    const existing = await facultyApi.getById(id);
+    const payload = {
+      faculty_id: data.employeeId || existing.employeeId,
+      name: data.name || existing.name,
+      email: data.email || existing.email,
+      phone: data.phone || existing.phone,
+      department: data.departmentId || existing.departmentId,
+      designation: data.designation || existing.designation,
+    };
+    const updated = await apiClient.put<{
+      id: string | number;
+      faculty_id: string;
+      name: string;
+      email: string;
+      phone: string;
+      department: string;
+      designation: string;
+    }>(API_ENDPOINTS.FACULTY.BY_ID(id), payload);
+    return {
+      id: updated.faculty_id || String(updated.id),
+      userId: String(updated.id),
+      employeeId: updated.faculty_id,
+      name: updated.name,
+      email: updated.email,
+      phone: updated.phone,
+      address: existing.address,
+      dateOfBirth: existing.dateOfBirth,
+      gender: existing.gender,
+      qualification: existing.qualification,
+      specialization: existing.specialization,
+      departmentId: updated.department,
+      designation: updated.designation,
+      joiningDate: existing.joiningDate,
+      status: existing.status,
+      assignedSubjects: existing.assignedSubjects,
+      assignedCourses: existing.assignedCourses,
+    };
   },
 
   /**

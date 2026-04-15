@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from app.db.session import Base
 
 
@@ -28,3 +29,5 @@ class Faculty(Base):
     department = Column(String, nullable=False)
 
     designation = Column(String, nullable=False)
+
+    timetable_entries = relationship("Timetable", back_populates="faculty")

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.core.permissions import require_roles
 from app.db.session import get_db
 from app.models.course import Course
+from app.schemas.common import paginated_response
 from app.schemas.course import CourseCreate
 from fastapi import Query
 
@@ -14,7 +16,8 @@ router = APIRouter()
 @router.post("/create")
 def create_course(
     course: CourseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     try:
@@ -30,23 +33,23 @@ def create_course(
         db.commit()
         db.refresh(new_course)
 
-        return {
-            "message": "Course created"
-        }
+        return new_course
 
-    except IntegrityError:
+    except IntegrityError as exc:
 
         db.rollback()
 
-        return {
-            "error": "Course with this code already exists"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Course with this code already exists",
+        ) from exc
 
 
 @router.post("/")
 def create_course_rest(
     course: CourseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return create_course(course=course, db=db)
 
@@ -58,7 +61,8 @@ def get_courses(
     limit: int = 10,
     search: str = Query(default=None),
     department: str = Query(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty", "student"]))
 ):
 
     query = db.query(Course)
@@ -72,24 +76,20 @@ def get_courses(
     if department:
         query = query.filter(Course.department == department)
 
-    courses = (
-        query
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return courses
+    total = query.count()
+    courses = query.offset(skip).limit(limit).all()
+    return paginated_response(courses, total, skip, limit)
 
 
 @router.get("/{course_code}")
 def get_course_by_code(
     course_code: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty", "student"]))
 ):
     db_course = db.query(Course).filter(Course.course_code == course_code).first()
     if not db_course:
-        return {"error": "Course not found"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     return db_course
 
 
@@ -98,7 +98,8 @@ def get_course_by_code(
 def update_course(
     course_code: str,
     course: CourseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     db_course = db.query(Course).filter(
@@ -106,9 +107,7 @@ def update_course(
     ).first()
 
     if not db_course:
-        return {
-            "error": "Course not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     db_course.name = course.name
     db_course.department = course.department
@@ -118,16 +117,15 @@ def update_course(
     db.commit()
     db.refresh(db_course)
 
-    return {
-        "message": "Course updated"
-    }
+    return db_course
 
 
 @router.put("/{course_code}")
 def update_course_rest(
     course_code: str,
     course: CourseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return update_course(course_code=course_code, course=course, db=db)
 
@@ -136,7 +134,8 @@ def update_course_rest(
 @router.delete("/delete/{course_code}")
 def delete_course(
     course_code: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
 
     db_course = db.query(Course).filter(
@@ -144,21 +143,18 @@ def delete_course(
     ).first()
 
     if not db_course:
-        return {
-            "error": "Course not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     db.delete(db_course)
     db.commit()
 
-    return {
-        "message": "Course deleted"
-    }
+    return {"success": True}
 
 
 @router.delete("/{course_code}")
 def delete_course_rest(
     course_code: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin"]))
 ):
     return delete_course(course_code=course_code, db=db)

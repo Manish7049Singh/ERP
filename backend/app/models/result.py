@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey
-from datetime import datetime
+from sqlalchemy.orm import relationship
 from app.db.session import Base
 
 
@@ -32,3 +32,5 @@ class Result(Base):
         DateTime,
         nullable=True
     )
+
+    student = relationship("Student", back_populates="results")

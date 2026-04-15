@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from app.db.session import Base
 
 
@@ -18,3 +19,5 @@ class Subject(Base):
         Integer,
         ForeignKey("departments.id")
     )
+
+    timetable_entries = relationship("Timetable", back_populates="subject")

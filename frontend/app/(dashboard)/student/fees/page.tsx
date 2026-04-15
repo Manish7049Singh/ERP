@@ -1,8 +1,8 @@
 "use client";
 
 import { ApiListPage } from "@/components/shared";
-import { apiClient } from "@/lib/api";
 import { getCurrentStudentRecord } from "@/lib/api/current-student";
+import { feesService } from "@/services";
 
 export default function StudentFeesPage() {
   return (
@@ -12,7 +12,7 @@ export default function StudentFeesPage() {
       fetchData={async () => {
         const student = await getCurrentStudentRecord();
         if (!student) return [];
-        return apiClient.get("/fees", {
+        return feesService.list({
           skip: 0,
           limit: 50,
           student_id: student.id,

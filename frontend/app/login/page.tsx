@@ -260,6 +260,9 @@ export default function LoginPage() {
                     </>
                   )}
                 </Button>
+                <Button asChild variant="outline" className="h-11 w-full text-sm font-medium">
+                  <Link href="/register">Create Account</Link>
+                </Button>
               </CardContent>
             </form>
           </Card>

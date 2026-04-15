@@ -13,6 +13,7 @@ export const API_URL = `${API_BASE_URL}/api/${API_VERSION}`;
 export const API_ENDPOINTS = {
   // Auth
   AUTH: {
+    REGISTER: "/auth/register",
     LOGIN: "/auth/login",
     LOGOUT: "/auth/logout",
     REFRESH: "/auth/refresh",

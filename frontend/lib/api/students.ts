@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/config/api";
 import type { Student, StudentFormData, PaginatedResponse, ApiResponse, FilterState } from "@/types";
+import { isBackendPaginatedResponse } from "./pagination";
 
 // ============================================
 // STUDENTS API SERVICE
@@ -16,7 +17,34 @@ export const studentsApi = {
     const skip = (page - 1) * limit;
 
     const response = await apiClient.get<
-      Array<{
+      | Array<{
+          id: string | number;
+          student_id?: string;
+          name: string;
+          email?: string;
+          phone?: string;
+          department?: string;
+          year?: number;
+        }>
+      | {
+          data: Array<{
+            id: string | number;
+            student_id?: string;
+            name: string;
+            email?: string;
+            phone?: string;
+            department?: string;
+            year?: number;
+          }>;
+          meta: { total: number; page: number; limit: number; total_pages: number };
+        }
+    >(API_ENDPOINTS.STUDENTS.BASE, {
+      skip,
+      limit,
+      search: filters.search,
+    });
+
+    const rows = isBackendPaginatedResponse<{
         id: string | number;
         student_id?: string;
         name: string;
@@ -24,15 +52,12 @@ export const studentsApi = {
         phone?: string;
         department?: string;
         year?: number;
-      }>
-    >(API_ENDPOINTS.STUDENTS.BASE, {
-      skip,
-      limit,
-      search: filters.search,
-    });
+      }>(response)
+      ? response.data
+      : response;
 
-    const normalized: Student[] = response.map((item) => ({
-      id: String(item.id),
+    const normalized: Student[] = rows.map((item) => ({
+      id: item.student_id || String(item.id),
       userId: String(item.id),
       rollNumber: item.student_id || "",
       name: item.name,
@@ -53,10 +78,10 @@ export const studentsApi = {
 
     return {
       data: normalized,
-      total: normalized.length,
-      page,
-      limit,
-      totalPages: normalized.length < limit ? page : page + 1,
+      total: isBackendPaginatedResponse(response) ? response.meta.total : normalized.length,
+      page: isBackendPaginatedResponse(response) ? response.meta.page : page,
+      limit: isBackendPaginatedResponse(response) ? response.meta.limit : limit,
+      totalPages: isBackendPaginatedResponse(response) ? response.meta.total_pages : 1,
     };
   },
 
@@ -75,7 +100,7 @@ export const studentsApi = {
     }>(API_ENDPOINTS.STUDENTS.BY_ID(id));
 
     return {
-      id: String(item.id),
+      id: item.student_id || String(item.id),
       userId: String(item.id),
       rollNumber: item.student_id || "",
       name: item.name,
@@ -119,7 +144,7 @@ export const studentsApi = {
     }>(`${API_ENDPOINTS.STUDENTS.BASE}/`, payload);
 
     return {
-      id: String(created.id),
+      id: created.student_id || String(created.id),
       userId: String(created.id),
       rollNumber: created.student_id,
       name: created.name,
@@ -143,7 +168,43 @@ export const studentsApi = {
    * Update student
    */
   update: async (id: string, data: Partial<StudentFormData>): Promise<Student> => {
-    return apiClient.put<Student>(API_ENDPOINTS.STUDENTS.BY_ID(id), data);
+    const existing = await studentsApi.getById(id);
+    const payload = {
+      student_id: data.rollNumber || existing.rollNumber,
+      name: data.name || existing.name,
+      email: data.email || existing.email,
+      phone: data.phone || existing.phone,
+      department: data.departmentId || existing.departmentId,
+      year: data.semester || existing.semester,
+    };
+    const updated = await apiClient.put<{
+      id: string | number;
+      student_id: string;
+      name: string;
+      email: string;
+      phone: string;
+      department: string;
+      year: number;
+    }>(API_ENDPOINTS.STUDENTS.BY_ID(id), payload);
+    return {
+      id: updated.student_id || String(updated.id),
+      userId: String(updated.id),
+      rollNumber: updated.student_id,
+      name: updated.name,
+      email: updated.email,
+      phone: updated.phone,
+      address: existing.address,
+      dateOfBirth: existing.dateOfBirth,
+      gender: existing.gender,
+      guardianName: existing.guardianName,
+      guardianPhone: existing.guardianPhone,
+      departmentId: updated.department,
+      courseId: existing.courseId,
+      semester: updated.year,
+      batch: existing.batch,
+      admissionDate: existing.admissionDate,
+      status: existing.status,
+    };
   },
 
   /**

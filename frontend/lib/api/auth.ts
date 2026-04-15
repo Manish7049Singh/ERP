@@ -1,54 +1,23 @@
-import { apiClient } from "./client";
-import { API_ENDPOINTS } from "@/config/api";
-import type { User, LoginCredentials, AuthResponse, ApiResponse } from "@/types";
-
-// ============================================
-// AUTH API SERVICE
-// ============================================
+import type { ApiResponse, AuthResponse, LoginCredentials, User } from "@/types";
+import { authService } from "@/services/auth";
 
 export const authApi = {
-  /**
-   * Login with email and password
-   */
-  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials);
-  },
-
-  /**
-   * Logout current user
-   */
-  logout: async (): Promise<void> => {
-    return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
-  },
-
-  /**
-   * Refresh access token
-   */
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => authService.login(credentials),
+  logout: async (): Promise<void> => authService.logout(),
   refreshToken: async (refreshToken: string): Promise<AuthResponse> => {
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.AUTH.REFRESH, { refreshToken });
+    const tokens = await authService.refresh(refreshToken);
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: await authService.me(),
+    };
   },
-
-  /**
-   * Get current authenticated user
-   */
-  getCurrentUser: async (): Promise<User> => {
-    return apiClient.get<User>(API_ENDPOINTS.AUTH.ME);
+  getCurrentUser: async (): Promise<User> => authService.me(),
+  register: authService.register,
+  forgotPassword: async (): Promise<ApiResponse<null>> => {
+    throw new Error("Forgot password endpoint is not implemented on backend yet.");
   },
-
-  /**
-   * Request password reset
-   */
-  forgotPassword: async (email: string): Promise<ApiResponse<null>> => {
-    return apiClient.post<ApiResponse<null>>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
-  },
-
-  /**
-   * Reset password with token
-   */
-  resetPassword: async (token: string, password: string): Promise<ApiResponse<null>> => {
-    return apiClient.post<ApiResponse<null>>(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
-      token,
-      password,
-    });
+  resetPassword: async (): Promise<ApiResponse<null>> => {
+    throw new Error("Reset password endpoint is not implemented on backend yet.");
   },
 };

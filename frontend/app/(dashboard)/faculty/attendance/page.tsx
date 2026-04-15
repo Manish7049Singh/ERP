@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient, studentsApi } from "@/lib/api";
+import { unwrapBackendList } from "@/lib/api/pagination";
 
 interface CourseLite {
   id: number;
@@ -41,7 +42,9 @@ export default function FacultyAttendancePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [students, setStudents] = useState<Array<{ id: string; name: string; rollNumber: string; email: string }>>([]);
+  const [students, setStudents] = useState<
+    Array<{ id: string; name: string; rollNumber: string; email: string; overallAttendance: number }>
+  >([]);
   const [courses, setCourses] = useState<CourseLite[]>([]);
 
   useEffect(() => {
@@ -50,15 +53,16 @@ export default function FacultyAttendancePage() {
       try {
         const [studentsRes, coursesRes] = await Promise.all([
           studentsApi.getAll({ page: 1, limit: 200 }),
-          apiClient.get<CourseLite[]>("/courses", { skip: 0, limit: 200 }),
+          apiClient.get<unknown>("/courses", { skip: 0, limit: 200 }),
         ]);
         setStudents(studentsRes.data.map((s) => ({
           id: s.id,
           name: s.name,
           rollNumber: s.rollNumber,
           email: s.email,
+          overallAttendance: 0,
         })));
-        setCourses(coursesRes);
+        setCourses(unwrapBackendList<CourseLite>(coursesRes));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to load students/courses");
       } finally {

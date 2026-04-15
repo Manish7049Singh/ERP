@@ -11,6 +11,7 @@ import time
 from app.core.logger import logger
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 
 
 app = FastAPI(
@@ -81,6 +82,18 @@ async def global_exception_handler(request, exc):
         content={
             "error": "Internal server error"
         }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation error on {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "message": "Validation failed",
+            "details": exc.errors(),
+        },
     )
 
 allowed_origins = os.getenv(

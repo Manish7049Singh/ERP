@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { unwrapBackendList } from "@/lib/api/pagination";
 
 export default function FacultyDashboardPage() {
   const [courses, setCourses] = useState<Array<{ id: number; name: string; course_code: string }>>([]);
@@ -12,14 +13,18 @@ export default function FacultyDashboardPage() {
 
   useEffect(() => {
     void (async () => {
-      const [courseRows, attendanceRows, studentRows] = await Promise.all([
-        apiClient.get<Array<{ id: number; name: string; course_code: string }>>("/courses", { skip: 0, limit: 10 }),
-        apiClient.get<Array<{ id: number; student_id: number; course_id: number; date: string; status: string }>>("/attendance", { skip: 0, limit: 20 }),
-        apiClient.get<Array<{ id: number; name: string }>>("/students", { skip: 0, limit: 200 }),
+      const [coursePayload, attendancePayload, studentPayload] = await Promise.all([
+        apiClient.get<unknown>("/courses", { skip: 0, limit: 10 }),
+        apiClient.get<unknown>("/attendance", { skip: 0, limit: 20 }),
+        apiClient.get<unknown>("/students", { skip: 0, limit: 200 }),
       ]);
-      setCourses(courseRows);
-      setAttendance(attendanceRows);
-      setStudents(studentRows);
+      setCourses(unwrapBackendList<{ id: number; name: string; course_code: string }>(coursePayload));
+      setAttendance(
+        unwrapBackendList<{ id: number; student_id: number; course_id: number; date: string; status: string }>(
+          attendancePayload
+        )
+      );
+      setStudents(unwrapBackendList<{ id: number; name: string }>(studentPayload));
     })();
   }, []);
 

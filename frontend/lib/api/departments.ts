@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/config/api";
 import type { ApiResponse, Department } from "@/types";
+import { unwrapBackendList } from "./pagination";
 
 export type DepartmentPayload = Omit<Department, "id">;
 
@@ -9,9 +10,8 @@ export type DepartmentPayload = Omit<Department, "id">;
 // ============================================
 export const departmentsApi = {
   getAll: async (): Promise<Department[]> => {
-    const response = await apiClient.get<Array<Partial<Department> & { id: string | number }>>(
-      API_ENDPOINTS.DEPARTMENTS.BASE
-    );
+    const payload = await apiClient.get<unknown>(API_ENDPOINTS.DEPARTMENTS.BASE);
+    const response = unwrapBackendList<Partial<Department> & { id: string | number }>(payload);
 
     return response.map((item) => ({
       id: String(item.id),
@@ -41,7 +41,19 @@ export const departmentsApi = {
   },
 
   create: async (data: DepartmentPayload): Promise<Department> => {
-    return apiClient.post<Department>(API_ENDPOINTS.DEPARTMENTS.BASE, data);
+    const created = await apiClient.post<{ id: string | number; name: string; code: string }>(
+      API_ENDPOINTS.DEPARTMENTS.BASE,
+      { name: data.name, code: data.code }
+    );
+    return {
+      id: String(created.id),
+      name: created.name,
+      code: created.code,
+      description: data.description,
+      headOfDepartment: data.headOfDepartment,
+      establishedYear: data.establishedYear,
+      status: data.status,
+    };
   },
 
   update: async (id: string, data: Partial<DepartmentPayload>): Promise<Department> => {

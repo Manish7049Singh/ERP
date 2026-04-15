@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { unwrapBackendList } from "@/lib/api/pagination";
 
 interface FeeRow {
   id: number;
@@ -19,7 +20,8 @@ export default function AccountantDashboardPage() {
 
   useEffect(() => {
     void (async () => {
-      const rows = await apiClient.get<FeeRow[]>("/fees", { skip: 0, limit: 200 });
+      const payload = await apiClient.get<unknown>("/fees", { skip: 0, limit: 200 });
+      const rows = unwrapBackendList<FeeRow>(payload);
       setFees(rows);
     })();
   }, []);

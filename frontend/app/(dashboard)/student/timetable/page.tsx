@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiClient } from "@/lib/api";
 import { getCurrentStudentRecord } from "@/lib/api/current-student";
+import { departmentsService, subjectsService, timetableService } from "@/services";
 
 interface TimetableRow {
   id: number;
@@ -41,9 +41,9 @@ export default function StudentTimetablePage() {
       }
 
       const [timetableRows, subjectRows, departmentRows] = await Promise.all([
-        apiClient.get<TimetableRow[]>("/timetable", { skip: 0, limit: 500 }),
-        apiClient.get<SubjectRow[]>("/subjects", { skip: 0, limit: 500 }),
-        apiClient.get<DepartmentRow[]>("/departments", { skip: 0, limit: 100 }),
+        timetableService.list({ skip: 0, limit: 500 }),
+        subjectsService.list({ skip: 0, limit: 500 }),
+        departmentsService.list({ skip: 0, limit: 100 }),
       ]);
 
       const department = departmentRows.find(

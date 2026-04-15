@@ -1,38 +1,15 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.permissions import require_roles
 from app.db.session import get_db
 from app.models.marks import Marks
 from app.models.result import Result
-from app.core.permissions import require_role
-from fastapi import Query
-from fastapi import Query
-from sqlalchemy.orm import Session
-from fastapi import Depends
+from app.schemas.common import paginated_response
 
 router = APIRouter()
-
-
-
-
-@router.get("/")
-def get_results(
-    skip: int = 0,
-    limit: int = 10,
-    db: Session = Depends(get_db)
-):
-
-    results = (
-        db.query(Result)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return results
-
-
 
 
 def calculate_grade(percentage):
@@ -55,7 +32,8 @@ def calculate_grade(percentage):
 @router.post("/generate/{student_id}")
 def generate_result(
     student_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty"]))
 ):
 
     existing_result = db.query(Result).filter(
@@ -65,9 +43,7 @@ def generate_result(
     # LOCK CHECK
     if existing_result and existing_result.is_published:
 
-        return {
-            "error": "Result already published and locked"
-        }
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Result already published and locked")
 
     marks = db.query(Marks).filter(
         Marks.student_id == student_id
@@ -75,9 +51,7 @@ def generate_result(
 
     if not marks:
 
-        return {
-            "error": "No marks found for this student"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No marks found for this student")
 
     total_marks = sum(
         mark.marks_obtained for mark in marks
@@ -100,9 +74,8 @@ def generate_result(
 
         db.commit()
 
-        return {
-            "message": "Result updated successfully"
-        }
+        db.refresh(existing_result)
+        return existing_result
 
     # CREATE new result
     new_result = Result(
@@ -114,17 +87,16 @@ def generate_result(
 
     db.add(new_result)
     db.commit()
-
-    return {
-        "message": "Result generated successfully"
-    }
+    db.refresh(new_result)
+    return new_result
 
 
 # GET RESULT
 @router.get("/student/{student_id}")
 def get_result(
     student_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty", "student"]))
 ):
 
     result = db.query(Result).filter(
@@ -133,9 +105,7 @@ def get_result(
 
     if not result:
 
-        return {
-            "error": "Result not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
     return result
 
@@ -145,7 +115,7 @@ def get_result(
 def publish_result(
     student_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("admin"))
+    _user=Depends(require_roles(["admin"]))
 ):
 
     result = db.query(Result).filter(
@@ -154,18 +124,14 @@ def publish_result(
 
     if not result:
 
-        return {
-            "error": "Result not found"
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
     result.is_published = True
-    result.published_at = datetime.utcnow()
+    result.published_at = datetime.now(timezone.utc)
 
     db.commit()
-
-    return {
-        "message": "Result published successfully"
-    }
+    db.refresh(result)
+    return result
 
 
 
@@ -173,14 +139,10 @@ def publish_result(
 def get_results(
     skip: int = 0,
     limit: int = 10,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _user=Depends(require_roles(["admin", "faculty", "student"]))
 ):
-
-    results = (
-        db.query(Result)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return results
+    query = db.query(Result)
+    total = query.count()
+    results = query.offset(skip).limit(limit).all()
+    return paginated_response(results, total, skip, limit)
