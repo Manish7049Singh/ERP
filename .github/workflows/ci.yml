@@ -1,69 +1,58 @@
 name: CI Pipeline
 
 on:
-push:
-pull_request:
+  push:
+  pull_request:
 
 jobs:
+  backend:
+    runs-on: ubuntu-latest
 
-backend:
-
-```
-runs-on: ubuntu-latest
-
-services:
-  postgres:
-    image: postgres:15
     env:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: test_db
-    ports:
-      - 5432:5432
+      DATABASE_URL: sqlite:///./college_erp_test.db
+      SECRET_KEY: test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REFRESH_TOKEN_EXPIRE_MINUTES: 10080
+      ENVIRONMENT: test
 
-steps:
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  - name: Checkout code
-    uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-  - name: Setup Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: 3.11
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
 
-  - name: Install dependencies
-    run: |
-      cd backend
-      pip install -r requirements.txt
+      - name: Run tests
+        run: |
+          cd backend
+          pytest
 
-  - name: Run tests
-    run: |
-      cd backend
-      pytest
-```
+  frontend:
+    runs-on: ubuntu-latest
 
-frontend:
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-```
-runs-on: ubuntu-latest
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-steps:
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
 
-  - name: Checkout code
-    uses: actions/checkout@v4
-
-  - name: Setup Node
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
-
-  - name: Install dependencies
-    run: |
-      cd frontend
-      npm install
-
-  - name: Build frontend
-    run: |
-      cd frontend
-      npm run build
-```
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
