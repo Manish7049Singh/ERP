@@ -36,3 +36,5 @@ class Attendance(Base):
 
     student = relationship("Student", back_populates="attendance_records")
     course = relationship("Course", back_populates="attendance_records")
+    #  Additional fields can be added as needed, such as timestamps for when the record was created or updated.
+    
