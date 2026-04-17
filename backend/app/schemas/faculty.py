@@ -9,3 +9,4 @@ class FacultyCreate(BaseModel):
     phone: str
     department: str
     designation: str
+    #  Add any additional fields as needed
