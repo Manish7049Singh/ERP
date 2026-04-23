@@ -10,6 +10,7 @@ venv/
 .env.local
 .env.production.local
 .env.*.local
+.sonarqube-env
 
 # Logs
 *.log
@@ -39,7 +40,12 @@ build/
 *.swp
 *.swo
 
+# SonarQube
+.scannerwork/
+.sonar/
+
 # Markdown files (except README.md)
 *.md
 !README.md
 !AWS_DEPLOYMENT_GUIDE.md
+!SONARQUBE_GUIDE.md
