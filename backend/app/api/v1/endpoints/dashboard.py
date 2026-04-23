@@ -9,8 +9,71 @@ from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.attendance import Attendance
 from app.models.result import Result
+from app.api.deps import get_current_user
 
 router = APIRouter()
+
+
+@router.get("/admin")
+def admin_dashboard(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Admin dashboard stats"""
+    total_students = db.query(Student).count()
+    total_faculty = db.query(Faculty).count()
+    total_courses = db.query(Course).count()
+    total_enrollments = db.query(Enrollment).count()
+
+    return {
+        "totalStudents": total_students,
+        "totalFaculty": total_faculty,
+        "totalCourses": total_courses,
+        "totalEnrollments": total_enrollments,
+        "recentActivities": []
+    }
+
+
+@router.get("/student")
+def student_dashboard(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Student dashboard stats"""
+    return {
+        "attendance": 0,
+        "courses": 0,
+        "assignments": 0,
+        "notifications": []
+    }
+
+
+@router.get("/faculty")
+def faculty_dashboard(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Faculty dashboard stats"""
+    return {
+        "classes": 0,
+        "students": 0,
+        "assignments": 0,
+        "notifications": []
+    }
+
+
+@router.get("/accountant")
+def accountant_dashboard(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Accountant dashboard stats"""
+    return {
+        "totalFees": 0,
+        "collected": 0,
+        "pending": 0,
+        "overdue": 0
+    }
 
 
 @router.get("/stats")

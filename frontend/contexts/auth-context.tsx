@@ -274,29 +274,39 @@ interface AuthGuardProps {
 export function AuthGuard({ children, allowedRoles, fallback }: AuthGuardProps) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+
+    // Check authentication
+    if (!isAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [isLoading, isAuthenticated, router]);
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && allowedRoles && user) {
+    // Check role authorization
+    if (allowedRoles && user) {
       if (!allowedRoles.includes(user.role)) {
         router.push("/unauthorized");
+        return;
       }
     }
+
+    setHasChecked(true);
   }, [isLoading, isAuthenticated, allowedRoles, user, router]);
 
-  if (isLoading) {
+  // Show loading while checking
+  if (isLoading || !hasChecked) {
     return fallback || <AuthLoadingSkeleton />;
   }
 
+  // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
   }
 
+  // Don't render if role not allowed
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return null;
   }

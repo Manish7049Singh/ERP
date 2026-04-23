@@ -11,6 +11,7 @@ from app.schemas.user import (
     UserLogin,
     UserOut,
 )
+from datetime import datetime, timezone
 from app.core.security import (
     hash_password,
     verify_password,
@@ -25,15 +26,16 @@ SECRET_KEY = settings.SECRET_KEY
 
 
 def serialize_user(user: User) -> dict:
-    user_out = UserOut.model_validate(user)
+    """Serialize user to match frontend User type"""
+    now = datetime.now(timezone.utc).isoformat()
     return {
-        "id": str(user_out.id),
-        "email": user_out.email,
-        "name": user_out.name,
-        "role": user_out.role,
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
         "isActive": True,
-        "createdAt": "",
-        "updatedAt": ""
+        "createdAt": now,
+        "updatedAt": now
     }
 
 
@@ -71,12 +73,11 @@ def register_user(
     }
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login")
 def login_user(
     user: UserLogin,
     db: Session = Depends(get_db)
 ):
-
     db_user = db.query(User).filter(
         User.email == user.email
     ).first()
@@ -104,7 +105,7 @@ def login_user(
     return {
         "accessToken": access_token,
         "refreshToken": refresh_token,
-        "user": UserOut.model_validate(db_user),
+        "user": serialize_user(db_user),
     }
 
 
