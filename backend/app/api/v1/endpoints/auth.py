@@ -44,33 +44,44 @@ def register_user(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists",
+    try:
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == user.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User with this email already exists",
+            )
+
+        # Hash password
+        hashed = hash_password(user.password)
+
+        # Create new user
+        new_user = User(
+            name=user.name,
+            email=user.email,
+            password=hashed,
+            role=user.role
         )
 
-    hashed = hash_password(
-        user.password
-    )
+        # Add to database
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
 
-    new_user = User(
-        name=user.name,
-        email=user.email,
-        password=hashed,
-        role=user.role
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return {
-        "success": True,
-        "message": "User created",
-        "data": serialize_user(new_user)
-    }
+        return {
+            "success": True,
+            "message": "User created successfully",
+            "data": serialize_user(new_user)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
 
 
 @router.post("/login")
@@ -78,35 +89,44 @@ def login_user(
     user: UserLogin,
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    try:
+        # Find user by email
+        db_user = db.query(User).filter(User.email == user.email).first()
 
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        if not db_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
 
-    if not verify_password(
-        user.password,
-        db_user.password
-    ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        # Verify password
+        if not verify_password(user.password, db_user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
 
-    token_payload = {
-        "user_id": db_user.id,
-        "role": db_user.role
-    }
-    access_token = create_access_token(
-        token_payload
-    )
-    refresh_token = create_refresh_token(
-        token_payload
-    )
+        # Create tokens
+        token_payload = {
+            "user_id": db_user.id,
+            "role": db_user.role
+        }
+        
+        access_token = create_access_token(token_payload)
+        refresh_token = create_refresh_token(token_payload)
 
-    return {
-        "accessToken": access_token,
-        "refreshToken": refresh_token,
-        "user": serialize_user(db_user),
-    }
+        return {
+            "accessToken": access_token,
+            "refreshToken": refresh_token,
+            "user": serialize_user(db_user),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed: {str(e)}"
+        )
 
 
 def _decode_token(token: str) -> dict:
@@ -158,4 +178,15 @@ def refresh_token(payload: TokenRefreshRequest):
 def logout_user():
     return {
         "success": True
+    }
+
+
+@router.get("/users/count")
+def get_users_count(db: Session = Depends(get_db)):
+    """Debug endpoint to check user count"""
+    count = db.query(User).count()
+    users = db.query(User).all()
+    return {
+        "total_users": count,
+        "users": [{"id": u.id, "email": u.email, "role": u.role} for u in users]
     }
