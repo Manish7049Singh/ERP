@@ -1,19 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function RegisterPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // No registration required - redirect to admin
-    router.push("/admin");
-  }, [router]);
-
-  return null;
-}
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
