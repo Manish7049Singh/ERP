@@ -100,7 +100,7 @@ allowed_origins = os.getenv(
     "BACKEND_CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000"
 ).split(",")
-
+# Add CORS middleware to allow requests from frontend origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in allowed_origins if origin.strip()],
